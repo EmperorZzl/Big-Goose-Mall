@@ -5,8 +5,8 @@
 
 /**
  * 绘制水印到 canvas
- * @param {CanvasRenderingContext2D} ctx - canvas 2d 上下文
  * @param {Object} params - 绘制参数
+ * @param {Object} params.canvas - canvas 节点对象（微信小程序 canvas-2d）
  * @param {number} params.canvasWidth - canvas 宽度
  * @param {number} params.canvasHeight - canvas 高度
  * @param {string} params.imagePath - 背景图片路径
@@ -19,7 +19,9 @@
  * @param {string} params.position - 位置模式: 'tile'|'corner'|'center'
  * @returns {Promise<void>}
  */
-export async function drawWatermark(ctx, params) {
+export async function drawWatermark(params) {
+  const canvas = params.canvas
+  const ctx = canvas.getContext('2d')
   const {
     canvasWidth,
     canvasHeight,
