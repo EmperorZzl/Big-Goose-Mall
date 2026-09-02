@@ -29,7 +29,7 @@ pages/index/index.vue（主容器，管理步骤切换）
 │   ├── ImagePicker.vue        # Step1: 图片选择器
 │   ├── WatermarkEditor.vue    # Step2: 水印编辑器
 │   ├── WatermarkCanvas.vue    # Canvas 渲染组件（Step2 预览 + Step3 导出共用）
-│   └── PreviewSaver.vue       # Step3: 预览与保存
+│   └── PreviewSaver.vue       # Step3: 预览、保存、分享
 └── utils/
     ├── watermark.js           # 水印绘制核心逻辑（纯函数，便于测试）
     └── storage.js             # 配置记忆（uni.setStorageSync / getStorageSync）
@@ -64,9 +64,21 @@ pages/index/index.vue（主容器，管理步骤切换）
 ### Step 3 — 预览保存
 
 - 全屏展示生成的带水印图片（`canvasToTempFilePath` 导出的临时文件）。
-- 主按钮「保存到相册」（渐变样式）→ `uni.saveImageToPhotosAlbum`，成功后 toast 提示。
-- 次按钮「换一张」→ 返回 Step 1。
-- 保存成功后按钮变为「已保存 ✓」，允许重复保存。
+- 操作按钮组：
+  - **保存到相册**（渐变主按钮）→ `uni.saveImageToPhotosAlbum`，成功后 toast 提示。
+  - **分享给好友**（次要按钮）→ 触发微信好友分享（`uni.share` 或 `button open-type="share"`）。
+  - **分享到朋友圈**（次要按钮）→ 触发朋友圈分享（图片类型）。
+  - **换一张**（底部小按钮）→ 返回 Step 1。
+- 保存/分享成功后显示成功状态，允许重复操作。
+
+### 分享能力说明（微信小程序平台限制）
+
+微信小程序**不能直接发送图片文件到聊天会话或朋友圈**，官方仅支持分享"小程序卡片"。实际方案：
+
+- **分享给好友**: `button open-type="share"` → 触发 `onShareAppMessage`，`imageUrl` 使用带水印图片的临时路径 → 好友收到一张以水印图为封面的**小程序卡片**，点击可进入小程序。
+- **分享到朋友圈**: `button open-type="share"` + `wx.showShareMenu({menus: ['shareAppMessage', 'shareTimeline']})` → 触发 `onShareTimeline`，同样以水印图为封面分享小程序页面（朋友圈打开为单页模式）。
+- **真正的图片发送**: 引导用户「保存到相册」后，在微信聊天中从相册发送。保存成功 toast 中附带此提示文案。
+- App 端（后续若打包 5+ App）可用 `uni.share` 的 image 类型直接分享图片文件，代码中用条件编译 `#ifdef APP-PLUS` 预留。
 
 ## 4. 核心技术方案
 
@@ -118,6 +130,7 @@ pages/index/index.vue（主容器，管理步骤切换）
 |------|------|
 | 相册/相机权限拒绝 | `uni.chooseImage` fail 回调 → 弹窗说明 → `uni.openSetting` 引导开启 |
 | 保存相册权限拒绝 | `saveImageToPhotosAlbum` fail 且 errno 为权限类 → 同上引导；其他错误 toast 明确提示 |
+| 分享失败 | 用户取消或失败时静默处理（微信官方行为），不需要额外提示 |
 | 超大图片 | `uni.getImageInfo` 获取尺寸，最长边超过 4096px 时提示「图片过大，可能处理较慢」 |
 | Canvas 绘制异常 | 绘制函数 try-catch，失败时 toast「生成失败，请重试」，不崩溃 |
 | 空文字提交 | 文字为空时「生成水印」按钮置灰 |
@@ -126,7 +139,8 @@ pages/index/index.vue（主容器，管理步骤切换）
 
 - 微信开发者工具模拟器 + 真机预览（iOS / Android 各一台）。
 - 图片适配：横图、竖图、方图、超大图（>4096px）。
-- 参数边界：密度最小/最大、角度 0°/90°、透明度 0/1、空文字。
+- 参数边界：密度最小/最大、角度 -45°/45°、透明度 0.1/1.0、空文字。
+- 分享链路：分享卡片封面是否为水印图、朋友圈单页模式打开是否正常。
 - 权限拒绝 → 引导开启 → 重试的完整链路。
 - 记忆功能：杀掉小程序后重进，配置恢复正确。
 
@@ -136,4 +150,3 @@ pages/index/index.vue（主容器，管理步骤切换）
 - 多张图片批量处理
 - 自定义字体
 - 水印位置拖拽自由摆放
-- 分享到微信好友/朋友圈（保存后用户自行分享）
