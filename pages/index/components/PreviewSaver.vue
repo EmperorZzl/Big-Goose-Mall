@@ -9,7 +9,7 @@
       <button class="action-btn share" open-type="share" @tap="handleShareToFriend">
         分享给好友
       </button>
-      <button class="action-btn share" @tap="handleShareToTimeline">
+      <button class="action-btn share" open-type="share" @tap="handleShareToTimeline">
         分享到朋友圈
       </button>
       <button class="action-btn secondary" @tap="handleReselect">
