@@ -39,16 +39,26 @@ export default {
     watermarkConfig: {
       type: Object,
       default: () => ({})
+    },
+    // 静默模式：渲染失败不弹 toast（导出 canvas 使用，由页面统一上报错误）
+    silent: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
     return {
       ctx: null,
-      canvas: null,
-      _initPromise: null,
-      _renderId: 0,
-      _pendingRender: null
+      canvas: null
     }
+  },
+  created() {
+    // 非响应式实例状态：Vue2 不会把 `_`/`$` 前缀的 data 键代理到实例上，
+    // 因此这类状态必须挂在 created() 中作为普通实例属性
+    this._initPromise = null
+    this._renderId = 0
+    this._pendingRender = null
+    this._lastRenderFailed = false
   },
   watch: {
     imagePath: {
@@ -154,20 +164,32 @@ export default {
         if (myId !== this._renderId) {
           return
         }
+        this._lastRenderFailed = false
       } catch (error) {
         // 仅由最新渲染上报错误，避免过期渲染重复弹 toast
         if (myId === this._renderId) {
+          this._lastRenderFailed = true
           console.error('Canvas 渲染失败:', error)
-          uni.showToast({
-            title: '渲染失败，请重试',
-            icon: 'none'
-          })
+          // 导出 canvas 处于静默模式，错误由页面（exportWatermarkedImage）统一抛出展示
+          if (!this.silent) {
+            uni.showToast({
+              title: '渲染失败，请重试',
+              icon: 'none'
+            })
+          }
         }
       } finally {
         if (this._pendingRender === task) {
           this._pendingRender = null
         }
       }
+    },
+    /**
+     * 最近一次实际执行的渲染是否失败（用于导出前校验画布有效）
+     * @returns {boolean}
+     */
+    hasRenderFailed() {
+      return this._lastRenderFailed === true
     },
     /**
      * 更新 canvas 实际尺寸并重渲染

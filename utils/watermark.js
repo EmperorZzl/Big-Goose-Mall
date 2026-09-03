@@ -4,6 +4,14 @@
  */
 
 /**
+ * 预览参考宽度（px）：用户在编辑器中调参数时所见预览 canvas 的宽度。
+ * 所有水印几何尺寸（字号、平铺间距、边距）都以该宽度为基准定义，
+ * 导出全尺寸 canvas 时按 canvasWidth / PREVIEW_REFERENCE_WIDTH 等比放大，
+ * 保证导出图与预览图所见即所得（WYSIWYG）。
+ */
+export const PREVIEW_REFERENCE_WIDTH = 325
+
+/**
  * 绘制水印到 canvas
  * @param {Object} params - 绘制参数
  * @param {Object} params.canvas - canvas 节点对象（微信小程序 canvas-2d）
@@ -14,7 +22,7 @@
  * @param {number} params.density - 密度 1-10 (平铺模式用)
  * @param {number} params.opacity - 透明度 0.1-1.0
  * @param {number} params.angle - 角度 -45~45 (度数)
- * @param {number} params.fontSize - 字号 (像素)
+ * @param {number} params.fontSize - 字号 (基于预览参考宽度的像素)
  * @param {string} params.color - 颜色 hex
  * @param {string} params.position - 位置模式: 'tile'|'corner'|'center'
  * @returns {Promise<void>}
@@ -47,35 +55,39 @@ export async function drawWatermark(params) {
   })
   ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight)
 
+  // 几何尺寸随画布宽度等比缩放（预览 325px 时 scale = 1，所见即所得）
+  const scale = canvasWidth / PREVIEW_REFERENCE_WIDTH
+  const scaledFontSize = fontSize * scale
+
   // 设置水印样式
   ctx.globalAlpha = opacity
   ctx.fillStyle = color
-  ctx.font = `${fontSize}px sans-serif`
+  ctx.font = `${scaledFontSize}px sans-serif`
   ctx.textBaseline = 'middle'
   ctx.textAlign = 'center'
 
   // 根据位置模式绘制水印
   switch (position) {
     case 'tile':
-      drawTileWatermark(ctx, text, canvasWidth, canvasHeight, density, angle, fontSize)
+      drawTileWatermark(ctx, text, canvasWidth, canvasHeight, density, angle, scaledFontSize, scale)
       break
     case 'corner':
-      drawCornerWatermark(ctx, text, canvasWidth, canvasHeight, fontSize)
+      drawCornerWatermark(ctx, text, canvasWidth, canvasHeight, scaledFontSize)
       break
     case 'center':
-      drawCenterWatermark(ctx, text, canvasWidth, canvasHeight, fontSize)
+      drawCenterWatermark(ctx, text, canvasWidth, canvasHeight, scaledFontSize)
       break
     default:
-      drawTileWatermark(ctx, text, canvasWidth, canvasHeight, density, angle, fontSize)
+      drawTileWatermark(ctx, text, canvasWidth, canvasHeight, density, angle, scaledFontSize, scale)
   }
 }
 
 /**
  * 平铺模式绘制水印
  */
-function drawTileWatermark(ctx, text, width, height, density, angle, fontSize) {
-  // 密度转换为间距: density 1-10 -> spacing 300-30
-  const spacing = 330 - (density * 30)
+function drawTileWatermark(ctx, text, width, height, density, angle, fontSize, scale) {
+  // 密度转换为间距: density 1-10 -> spacing 300-30（预览基准像素），随画布等比缩放
+  const spacing = (330 - (density * 30)) * scale
   const angleRad = (angle * Math.PI) / 180
 
   ctx.save()

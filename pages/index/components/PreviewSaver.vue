@@ -64,9 +64,16 @@ export default {
   methods: {
     async handleSaveToAlbum() {
       try {
-        await uni.saveImageToPhotosAlbum({
+        // uni-app Vue2 promise 化约定：await uni.* API（无回调时）resolve 为 [err, res]，不会 reject
+        const [err] = await uni.saveImageToPhotosAlbum({
           filePath: this.imagePath
         })
+
+        if (err) {
+          console.error('保存失败:', err)
+          this.showSaveError(err)
+          return
+        }
 
         this.hasSaved = true
         this.saveButtonText = '已保存 ✓'
@@ -79,27 +86,34 @@ export default {
 
         this.$emit('saved')
       } catch (err) {
+        // 兼容未来切换为标准 reject 风格或原生回调异常
         console.error('保存失败:', err)
-
-        // 权限拒绝引导
-        if (err.errMsg.includes('auth')) {
-          uni.showModal({
-            title: '权限受限',
-            content: '请在设置中开启相册权限',
-            showCancel: true,
-            confirmText: '去设置',
-            success: (res) => {
-              if (res.confirm) {
-                uni.openSetting()
-              }
+        this.showSaveError(err)
+      }
+    },
+    /**
+     * 保存失败处理：权限拒绝时引导去设置页
+     * @param {Object} err - uni API 返回的错误对象
+     */
+    showSaveError(err) {
+      // 空值保护：errMsg 可能缺失
+      if (err && err.errMsg && err.errMsg.includes('auth')) {
+        uni.showModal({
+          title: '权限受限',
+          content: '请在设置中开启相册权限',
+          showCancel: true,
+          confirmText: '去设置',
+          success: (res) => {
+            if (res.confirm) {
+              uni.openSetting()
             }
-          })
-        } else {
-          uni.showToast({
-            title: '保存失败，请重试',
-            icon: 'none'
-          })
-        }
+          }
+        })
+      } else {
+        uni.showToast({
+          title: '保存失败，请重试',
+          icon: 'none'
+        })
       }
     },
     handleShareToFriend() {

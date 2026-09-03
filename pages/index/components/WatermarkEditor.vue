@@ -14,7 +14,7 @@
       />
     </view>
 
-    <!-- 隐藏的导出 canvas（用于生成最终全尺寸水印图） -->
+    <!-- 隐藏的导出 canvas（用于生成最终全尺寸水印图）。silent：渲染失败由下方统一抛错，避免双重提示 -->
     <watermark-canvas
       v-if="exportMode"
       ref="exportCanvas"
@@ -24,6 +24,7 @@
       :watermark-config="config"
       :wrapper-width="0"
       canvas-id="export-canvas"
+      silent
       style="position: fixed; left: -9999px; opacity: 0;"
     />
 
@@ -298,9 +299,16 @@ export default {
       try {
         // 等待 canvas 按新尺寸渲染完成（ref 实例在 $refs 上）
         await this.$nextTick()
-        await this.$refs.exportCanvas.renderCanvas()
+        const exportCanvas = this.$refs.exportCanvas
+        await exportCanvas.renderCanvas()
 
-        return await this.$refs.exportCanvas.exportToTempFilePath()
+        // 渲染失败时不导出（否则会导出未绘制水印的空白画布），
+        // 抛错由 handleGenerate 的 catch 统一提示"生成失败"
+        if (exportCanvas.hasRenderFailed()) {
+          throw new Error('导出 canvas 渲染失败')
+        }
+
+        return await exportCanvas.exportToTempFilePath()
       } finally {
         // 无论成功失败都退出导出模式，恢复预览区显示
         this.exportMode = false

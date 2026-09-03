@@ -31,6 +31,10 @@ export default {
           this.$emit('select', { tempFilePath })
         },
         fail: (err) => {
+          // 用户取消选择（errMsg 含 'cancel'）属正常操作，不弹权限引导
+          if (err && err.errMsg && err.errMsg.includes('cancel')) {
+            return
+          }
           console.error('选择图片失败:', err)
           uni.showModal({
             title: '权限受限',
@@ -106,7 +110,7 @@ export default {
     border: 2rpx solid rgba(255, 255, 255, 0.2);
   }
 
-  &::active {
+  &:active {
     transform: scale(0.96);
   }
 }
