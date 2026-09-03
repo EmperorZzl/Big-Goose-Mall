@@ -14,18 +14,22 @@
       />
     </view>
 
-    <!-- 隐藏的导出 canvas（用于生成最终全尺寸水印图）。silent：渲染失败由下方统一抛错，避免双重提示 -->
+    <!-- 隐藏的导出 canvas（用于生成最终全尺寸水印图）。silent：渲染失败由下方统一抛错，避免双重提示。
+         注意：canvas 不能移出视口（left:-9999px 等），否则真机原生层不光栅化、导出空白图。
+         这里让它以小尺寸完整留在视口内，用 z-index 压到页面不透明背景之下实现视觉隐藏。 -->
     <watermark-canvas
       v-if="exportMode"
       ref="exportCanvas"
       :canvas-width="exportWidth"
       :canvas-height="exportHeight"
+      :display-width="exportDisplayWidth"
+      :display-height="exportDisplayHeight"
       :image-path="imagePath"
       :watermark-config="config"
-      :wrapper-width="0"
+      wrapper-width="650"
       canvas-id="export-canvas"
       silent
-      style="position: fixed; left: -9999px; opacity: 0;"
+      class="export-canvas-hidden"
     />
 
     <!-- 位置模式切换 -->
@@ -190,6 +194,10 @@ export default {
       exportMode: false,
       exportWidth: 0,
       exportHeight: 0,
+      // 导出 canvas 的显示尺寸（px）：canvas 须完整位于视口内才能在真机上正常光栅化，
+      // 因此显示为小尺寸，位图（canvas.width/height）仍为原图分辨率，导出清晰度不受影响
+      exportDisplayWidth: 325,
+      exportDisplayHeight: 325,
       // 位置模式
       positionModes: [
         { value: 'tile', label: '平铺' },
@@ -291,9 +299,12 @@ export default {
         })
       }
 
-      // 在隐藏的全尺寸 canvas 上绘制
+      // 在隐藏的全尺寸 canvas 上绘制（位图全尺寸，显示尺寸按比例缩小以留在视口内）
       this.exportWidth = imgWidth
       this.exportHeight = imgHeight
+      const displayScale = Math.min(1, 325 / Math.max(imgWidth, imgHeight))
+      this.exportDisplayWidth = Math.max(1, Math.round(imgWidth * displayScale))
+      this.exportDisplayHeight = Math.max(1, Math.round(imgHeight * displayScale))
       this.exportMode = true
 
       try {
@@ -345,6 +356,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+// 导出 canvas 视觉隐藏：保持在视口内（真机要求），仅用层级压到页面不透明背景之下
+.export-canvas-hidden {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -9999;
+}
+
 .watermark-editor {
   display: flex;
   flex-direction: column;

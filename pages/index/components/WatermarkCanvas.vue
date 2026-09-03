@@ -4,7 +4,7 @@
       type="2d"
       :id="canvasId"
       :canvas-id="canvasId"
-      :style="{ width: canvasWidth + 'px', height: canvasHeight + 'px' }"
+      :style="canvasStyle"
       class="watermark-canvas"
     ></canvas>
   </view>
@@ -32,6 +32,16 @@ export default {
       type: Number,
       required: true // 实际像素高度
     },
+    // 显示尺寸（CSS px）。0 = 与位图尺寸一致。
+    // 导出场景传小尺寸让 canvas 完整落在视口内（位图仍为全尺寸，导出分辨率不受影响）
+    displayWidth: {
+      type: Number,
+      default: 0
+    },
+    displayHeight: {
+      type: Number,
+      default: 0
+    },
     imagePath: {
       type: String,
       default: ''
@@ -50,6 +60,19 @@ export default {
     return {
       ctx: null,
       canvas: null
+    }
+  },
+  computed: {
+    /**
+     * canvas 的 CSS 显示尺寸与位图尺寸解耦：
+     * 位图尺寸（canvas.width/height）决定导出分辨率，
+     * 显示尺寸决定布局。canvas 必须完整位于视口内，
+     * 否则真机原生层不光栅化，导出为空白图。
+     */
+    canvasStyle() {
+      const w = this.displayWidth > 0 ? this.displayWidth : this.canvasWidth
+      const h = this.displayHeight > 0 ? this.displayHeight : this.canvasHeight
+      return { width: w + 'px', height: h + 'px' }
     }
   },
   created() {
