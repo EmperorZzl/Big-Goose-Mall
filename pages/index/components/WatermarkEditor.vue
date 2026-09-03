@@ -160,6 +160,10 @@
 import WatermarkCanvas from './WatermarkCanvas.vue'
 import { getDefaultConfig } from '@/utils/watermark.js'
 
+// 导出尺寸上限：微信 iOS canvas 2d 面积上限约 16.7M px（≈4096×4096），
+// 超限（如 48MP 照片 8000×6000）会导出失败或得到空白图
+const MAX_EXPORT_SIDE = 4096
+
 export default {
   name: 'WatermarkEditor',
   components: {
@@ -261,7 +265,7 @@ export default {
       this.$emit('reselect')
     },
     /**
-     * 用原图尺寸绘制水印并导出（清晰度无损）
+     * 用原图尺寸绘制水印并导出（清晰度无损，超限自动等比缩放）
      * @returns {Promise<string>} 带水印图片的临时路径
      */
     async exportWatermarkedImage() {
@@ -271,19 +275,36 @@ export default {
         throw new Error('获取原图信息失败')
       }
 
+      let imgWidth = info.width
+      let imgHeight = info.height
+
+      // 超大图保护：最长边超过上限时等比缩放，避免超出 canvas 面积上限导致导出失败/空白
+      if (Math.max(imgWidth, imgHeight) > MAX_EXPORT_SIDE) {
+        const scale = MAX_EXPORT_SIDE / Math.max(imgWidth, imgHeight)
+        // 向下取整，保证缩放后不会因舍入仍略超上限
+        imgWidth = Math.floor(imgWidth * scale)
+        imgHeight = Math.floor(imgHeight * scale)
+        uni.showToast({
+          title: '图片较大，已自动缩放处理',
+          icon: 'none'
+        })
+      }
+
       // 在隐藏的全尺寸 canvas 上绘制
-      this.exportWidth = info.width
-      this.exportHeight = info.height
+      this.exportWidth = imgWidth
+      this.exportHeight = imgHeight
       this.exportMode = true
 
-      // 等待 canvas 按新尺寸渲染完成（ref 实例在 $refs 上）
-      await this.$nextTick()
-      await this.$refs.exportCanvas.renderCanvas()
+      try {
+        // 等待 canvas 按新尺寸渲染完成（ref 实例在 $refs 上）
+        await this.$nextTick()
+        await this.$refs.exportCanvas.renderCanvas()
 
-      const tempFilePath = await this.$refs.exportCanvas.exportToTempFilePath()
-      this.exportMode = false
-
-      return tempFilePath
+        return await this.$refs.exportCanvas.exportToTempFilePath()
+      } finally {
+        // 无论成功失败都退出导出模式，恢复预览区显示
+        this.exportMode = false
+      }
     },
     handleGenerate() {
       if (!this.config.text) {
