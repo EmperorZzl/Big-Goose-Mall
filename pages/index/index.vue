@@ -2,7 +2,7 @@
   <view class="container">
     <!-- 标题：仅第 1 步做品牌露出。第 2/3 步要把高度让给图片预览 -->
     <view v-if="currentStep === 1" class="header">
-      <text class="title">大额商城 · 水印工具</text>
+      <text class="title">Big-Goose-Mall</text>
     </view>
 
     <!-- 步骤指示器 -->

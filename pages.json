@@ -3,13 +3,13 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "水印工具"
+				"navigationBarTitleText": "Big-Goose-Mall"
 			}
 		}
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "white",
-		"navigationBarTitleText": "水印工具",
+		"navigationBarTitleText": "Big-Goose-Mall",
 		"navigationBarBackgroundColor": "#0F0F1A",
 		"backgroundColor": "#F8F8F8"
 	}
