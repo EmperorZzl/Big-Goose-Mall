@@ -215,6 +215,28 @@ export default {
       return this._lastRenderFailed === true
     },
     /**
+     * 等待画布内容落定：初始化完成 + 所有在途渲染结束。
+     *
+     * 渲染是异步的（drawWatermark 内需 await 图片加载），而 renderCanvas() 在
+     * 「请求已过期」时会提前 return，并不代表绘制完成。若直接导出，读到的会是
+     * clearRect 之后、drawImage 之前的透明画布（保存到相册显示为黑图）。
+     * 导出前必须先调用本方法。
+     * @returns {Promise<void>}
+     */
+    async waitForIdle() {
+      if (this._initPromise) {
+        try {
+          await this._initPromise
+        } catch (error) {
+          return
+        }
+      }
+      // 循环等待：等待期间可能又有新的渲染请求入队
+      while (this._pendingRender) {
+        await this._pendingRender.catch(() => {})
+      }
+    },
+    /**
      * 更新 canvas 实际尺寸并重渲染
      */
     async updateCanvasSize() {
@@ -230,10 +252,8 @@ export default {
      * @returns {Promise<string>} 临时文件路径
      */
     async exportToTempFilePath() {
-      // 等待 canvas 初始化完成（init 竞态保护）
-      if (this._initPromise) {
-        await this._initPromise
-      }
+      // 等待初始化与在途渲染全部结束，避免导出尚未绘制完成的透明画布
+      await this.waitForIdle()
 
       if (!this.canvas) {
         throw new Error('Canvas 未初始化')

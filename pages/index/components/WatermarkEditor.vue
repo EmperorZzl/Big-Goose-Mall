@@ -312,6 +312,9 @@ export default {
         await this.$nextTick()
         const exportCanvas = this.$refs.exportCanvas
         await exportCanvas.renderCanvas()
+        // renderCanvas() 在请求过期时会提前返回，此时绘制尚未完成；
+        // 必须等画布内容真正落定后再校验/导出，否则会导出透明画布（相册中显示为黑图）
+        await exportCanvas.waitForIdle()
 
         // 渲染失败时不导出（否则会导出未绘制水印的空白画布），
         // 抛错由 handleGenerate 的 catch 统一提示"生成失败"
