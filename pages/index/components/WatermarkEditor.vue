@@ -1,15 +1,15 @@
 <template>
   <view class="watermark-editor">
-    <!-- 预览区 -->
+    <!-- 预览区：canvas 尺寸由 initPreviewLayout() 量测真实可用空间后 contain-fit 算出，
+         保证整图完整可见（不再按固定宽度算高、被 overflow 裁掉上下） -->
     <view class="preview-area">
       <watermark-canvas
-        v-if="previewImage && !exportMode"
+        v-if="previewImage && !exportMode && previewWidth > 0"
         ref="previewCanvas"
         :canvas-width="previewWidth"
         :canvas-height="previewHeight"
         :image-path="previewImage"
         :watermark-config="config"
-        :wrapper-width="650"
         canvas-id="preview-canvas"
       />
     </view>
@@ -26,34 +26,37 @@
       :display-height="exportDisplayHeight"
       :image-path="imagePath"
       :watermark-config="config"
-      wrapper-width="650"
       canvas-id="export-canvas"
       silent
       class="export-canvas-hidden"
     />
 
-    <!-- 位置模式切换 -->
-    <view class="position-selector">
-      <view
-        v-for="mode in positionModes"
-        :key="mode.value"
-        class="position-btn"
-        :class="{ active: config.position === mode.value }"
-        @tap="setPosition(mode.value)"
-      >
-        {{ mode.label }}
-      </view>
-    </view>
-
-    <!-- 参数面板 -->
+    <!-- 参数面板：分组 + 每行只放一个控件，避免互相挤压 -->
     <view class="params-panel">
-      <!-- 文字输入 -->
-      <view class="param-row">
-        <text class="param-label">水印文字</text>
+      <!-- 位置模式 -->
+      <view class="param-group">
+        <text class="group-label">水印位置</text>
+        <view class="position-selector">
+          <view
+            v-for="mode in positionModes"
+            :key="mode.value"
+            class="position-btn"
+            :class="{ active: config.position === mode.value }"
+            @tap="setPosition(mode.value)"
+          >
+            {{ mode.label }}
+          </view>
+        </view>
+      </view>
+
+      <!-- 文字：输入框独占一行，预设标签另起一行 -->
+      <view class="param-group">
+        <text class="group-label">水印文字</text>
         <input
           v-model="config.text"
           class="text-input"
           placeholder="输入水印文字"
+          placeholder-class="text-input-placeholder"
           @input="handleConfigChange"
         />
         <view class="preset-tags">
@@ -68,84 +71,99 @@
         </view>
       </view>
 
-      <!-- 密度滑块 (仅平铺模式) -->
-      <view v-if="config.position === 'tile'" class="param-row">
-        <text class="param-label">密度</text>
-        <slider
-          :value="config.density"
-          :min="1"
-          :max="10"
-          :step="1"
-          activeColor="#00F5FF"
-          backgroundColor="rgba(255,255,255,0.1)"
-          @change="handleDensityChange"
-          class="param-slider"
-        />
-        <text class="param-value">{{ config.density }}</text>
-      </view>
+      <!-- 样式参数：统一三列栅格（标签 / 控件 / 数值） -->
+      <view class="param-group">
+        <text class="group-label">样式</text>
 
-      <!-- 透明度滑块 -->
-      <view class="param-row">
-        <text class="param-label">透明度</text>
-        <slider
-          :value="config.opacity * 10"
-          :min="1"
-          :max="10"
-          :step="1"
-          activeColor="#00F5FF"
-          backgroundColor="rgba(255,255,255,0.1)"
-          @change="handleOpacityChange"
-          class="param-slider"
-        />
-        <text class="param-value">{{ (config.opacity * 100).toFixed(0) }}%</text>
-      </view>
-
-      <!-- 角度滑块 (仅平铺模式) -->
-      <view v-if="config.position === 'tile'" class="param-row">
-        <text class="param-label">角度</text>
-        <slider
-          :value="config.angle + 45"
-          :min="0"
-          :max="90"
-          :step="1"
-          activeColor="#00F5FF"
-          backgroundColor="rgba(255,255,255,0.1)"
-          @change="handleAngleChange"
-          class="param-slider"
-        />
-        <text class="param-value">{{ config.angle }}°</text>
-      </view>
-
-      <!-- 字号滑块 -->
-      <view class="param-row">
-        <text class="param-label">字号</text>
-        <slider
-          :value="config.fontSize"
-          :min="12"
-          :max="48"
-          :step="1"
-          activeColor="#00F5FF"
-          backgroundColor="rgba(255,255,255,0.1)"
-          @change="handleFontSizeChange"
-          class="param-slider"
-        />
-        <text class="param-value">{{ config.fontSize }}</text>
-      </view>
-
-      <!-- 颜色选择 -->
-      <view class="param-row">
-        <text class="param-label">颜色</text>
-        <view class="color-picker">
-          <view
-            v-for="color in presetColors"
-            :key="color"
-            class="color-dot"
-            :class="{ active: config.color === color }"
-            :style="{ backgroundColor: color }"
-            @tap="setColor(color)"
+        <!-- 密度、角度仅平铺模式生效。按设计文档「置灰」而非隐藏：
+             既让用户看得见有哪些能力，也让面板高度恒定、预览区不必反复重新量测 -->
+        <view class="param-row" :class="{ muted: !isTile }">
+          <text class="param-label">密度</text>
+          <slider
+            :value="config.density"
+            :min="1"
+            :max="10"
+            :step="1"
+            :disabled="!isTile"
+            activeColor="#00F5FF"
+            block-color="#00F5FF"
+            backgroundColor="rgba(255,255,255,0.1)"
+            @change="handleDensityChange"
+            class="param-slider"
           />
-          <view class="color-dot custom" @tap="showCustomColorPicker">
-            <text class="custom-color-text">+</text>
+          <text class="param-value">{{ config.density }}</text>
+        </view>
+
+        <view class="param-row">
+          <text class="param-label">透明度</text>
+          <slider
+            :value="config.opacity * 10"
+            :min="1"
+            :max="10"
+            :step="1"
+            activeColor="#00F5FF"
+            block-color="#00F5FF"
+            backgroundColor="rgba(255,255,255,0.1)"
+            @change="handleOpacityChange"
+            class="param-slider"
+          />
+          <text class="param-value">{{ (config.opacity * 100).toFixed(0) }}%</text>
+        </view>
+
+        <view class="param-row" :class="{ muted: !isTile }">
+          <text class="param-label">角度</text>
+          <slider
+            :value="config.angle + 45"
+            :min="0"
+            :max="90"
+            :step="1"
+            :disabled="!isTile"
+            activeColor="#00F5FF"
+            block-color="#00F5FF"
+            backgroundColor="rgba(255,255,255,0.1)"
+            @change="handleAngleChange"
+            class="param-slider"
+          />
+          <text class="param-value">{{ config.angle }}°</text>
+        </view>
+
+        <view class="param-row">
+          <text class="param-label">字号</text>
+          <slider
+            :value="config.fontSize"
+            :min="12"
+            :max="48"
+            :step="1"
+            activeColor="#00F5FF"
+            block-color="#00F5FF"
+            backgroundColor="rgba(255,255,255,0.1)"
+            @change="handleFontSizeChange"
+            class="param-slider"
+          />
+          <text class="param-value">{{ config.fontSize }}</text>
+        </view>
+
+        <view class="param-row">
+          <text class="param-label">颜色</text>
+          <view class="color-picker">
+            <view
+              v-for="color in presetColors"
+              :key="color"
+              class="color-dot"
+              :class="{ active: config.color === color }"
+              :style="{ backgroundColor: color }"
+              @tap="setColor(color)"
+            />
+            <!-- 第 7 格：当前为自定义色时显示该色（解决选了自定义色后没有任何色块高亮的问题），否则显示 +。
+                 style 必须拼成字符串 —— WXML 不支持在 style 绑定里写对象字面量，会编译报错 -->
+            <view
+              class="color-dot custom"
+              :class="{ active: !!customColor }"
+              :style="customColor ? 'background-color:' + customColor + ';' : ''"
+              @tap="showCustomColorPicker"
+            >
+              <text v-if="!customColor" class="custom-color-text">+</text>
+            </view>
           </view>
         </view>
       </view>
@@ -210,26 +228,55 @@ export default {
       presetColors: ['#FFFFFF', '#000000', '#808080', '#FF0000', '#FFFF00', '#00FFFF']
     }
   },
+  computed: {
+    /** 密度/角度仅在平铺模式下生效，其余模式置灰 */
+    isTile() {
+      return this.config.position === 'tile'
+    },
+    /** 当前颜色若不在预设色板里，就是自定义色（空串表示未使用自定义色） */
+    customColor() {
+      return this.presetColors.indexOf(this.config.color) === -1 ? this.config.color : ''
+    }
+  },
   async mounted() {
-    await this.calculatePreviewSize()
+    await this.initPreviewLayout()
   },
   methods: {
-    async calculatePreviewSize() {
+    /**
+     * 量测预览区真实可用尺寸。
+     * 预览区是 flex:1，其高度取决于参数面板占掉多少，只能运行时量测。
+     */
+    measurePreviewArea() {
+      return new Promise((resolve) => {
+        uni.createSelectorQuery().in(this)
+          .select('.preview-area')
+          .boundingClientRect((rect) => resolve(rect || null))
+          .exec()
+      })
+    },
+    /**
+     * 按可用空间 contain-fit 出预览尺寸：整图完整放得下，且不改变长宽比。
+     * 这是「图片能看全」的关键 —— 取 min 而非固定宽度算高。
+     */
+    async initPreviewLayout() {
       // 获取图片信息（uni-app Vue2 promise 风格返回 [err, info]）
       const [err, info] = await uni.getImageInfo({ src: this.imagePath })
       if (err || !info) {
         console.error('获取图片信息失败:', err)
         return
       }
-      const imgWidth = info.width
-      const imgHeight = info.height
 
-      // 容器宽度 650rpx，转为 px (假设 2rpx = 1px)
-      const containerWidth = 325 // px
-      const ratio = imgWidth / imgHeight
+      // 等一次布局稳定：mounted 时参数面板尚未定型，此时量测会拿到错误高度
+      await this.$nextTick()
+      const box = await this.measurePreviewArea()
 
-      this.previewWidth = containerWidth
-      this.previewHeight = containerWidth / ratio
+      // 量测失败时退化为按 325px 见方的可用空间，至少不至于不显示
+      const boxWidth = box && box.width > 0 ? box.width : 325
+      const boxHeight = box && box.height > 0 ? box.height : 325
+
+      const scale = Math.min(boxWidth / info.width, boxHeight / info.height)
+      this.previewWidth = Math.max(1, Math.floor(info.width * scale))
+      this.previewHeight = Math.max(1, Math.floor(info.height * scale))
     },
     handleConfigChange() {
       this.$emit('configChange', this.config)
@@ -262,11 +309,27 @@ export default {
       this.config.text = text
       this.handleConfigChange()
     },
+    /**
+     * 自定义色值输入。用 uni.showModal 的 editable 模式（参数原样透传给 wx.showModal）
+     * 而非 showActionSheet —— 后者只能让用户在固定选项里选，做不了真正的自定义色。
+     */
     showCustomColorPicker() {
-      uni.showActionSheet({
-        itemList: this.presetColors.map(c => `${c} (预设)`),
+      uni.showModal({
+        title: '自定义颜色',
+        editable: true,
+        placeholderText: '#RRGGBB，如 #FF5722',
         success: (res) => {
-          this.setColor(this.presetColors[res.tapIndex])
+          if (!res.confirm) return
+          const raw = (res.content || '').trim()
+          // 接受 #RGB / #RRGGBB，也容忍省略 #
+          if (!/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(raw)) {
+            uni.showToast({
+              title: '格式不对，请输入 #RRGGBB',
+              icon: 'none'
+            })
+            return
+          }
+          this.setColor((raw[0] === '#' ? raw : '#' + raw).toUpperCase())
         }
       })
     },
@@ -299,10 +362,17 @@ export default {
         })
       }
 
-      // 在隐藏的全尺寸 canvas 上绘制（位图全尺寸，显示尺寸按比例缩小以留在视口内）
+      // 在隐藏的全尺寸 canvas 上绘制（位图全尺寸，显示尺寸按比例缩小以留在视口内）。
+      // 显示尺寸上限取自预览区实测尺寸（已确定落在视口内），并再夹到 320px 以内兼容窄屏机型。
+      const box = await this.measurePreviewArea()
+      const boxSide = box && Math.max(box.width, box.height) > 0
+        ? Math.max(box.width, box.height)
+        : 320
+      const displayBound = Math.min(320, boxSide)
+      const displayScale = Math.min(1, displayBound / Math.max(imgWidth, imgHeight))
+
       this.exportWidth = imgWidth
       this.exportHeight = imgHeight
-      const displayScale = Math.min(1, 325 / Math.max(imgWidth, imgHeight))
       this.exportDisplayWidth = Math.max(1, Math.round(imgWidth * displayScale))
       this.exportDisplayHeight = Math.max(1, Math.round(imgHeight * displayScale))
       this.exportMode = true
@@ -367,43 +437,73 @@ export default {
   z-index: -9999;
 }
 
+// 不写 height:100vh/100% —— 高度由父级 .step-body 撑开，内容超高时交给页面滚动
 .watermark-editor {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100vh;
   padding: 0 30rpx 30rpx;
   box-sizing: border-box;
 }
 
 .preview-area {
-  flex: 1;
+  flex: none;
+  // 给预览一个确定的盒子高度：contain-fit 需要确定的可用空间。
+  // 用 vh 而非 flex:1，是为了不依赖参数面板占掉多少高度（各机型表现一致）。
+  // 不设 overflow:hidden —— canvas 尺寸已由 contain-fit 算好，裁切只会掩盖尺寸算错。
+  height: 44vh;
+  min-height: 400rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  margin-bottom: 30rpx;
+  margin-bottom: 24rpx;
+}
+
+.params-panel {
+  flex: none;
+  background: $watermark-bg-card;
+  border: 2rpx solid $watermark-border-card;
+  border-radius: 16rpx;
+  padding: 24rpx 30rpx;
+  margin-bottom: 24rpx;
+}
+
+// 分组之间用细分隔线，避免一大片参数糊在一起
+.param-group {
+  & + & {
+    margin-top: 20rpx;
+    padding-top: 20rpx;
+    border-top: 2rpx solid $watermark-border-card;
+  }
+}
+
+.group-label {
+  display: block;
+  font-size: 24rpx;
+  color: $watermark-text-secondary;
+  letter-spacing: 2rpx;
+  margin-bottom: 16rpx;
 }
 
 .position-selector {
   display: flex;
   gap: 16rpx;
-  margin-bottom: 30rpx;
 }
 
 .position-btn {
   flex: 1;
-  padding: 20rpx;
+  padding: 18rpx 0;
   border-radius: 48rpx;
   text-align: center;
   font-size: 28rpx;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.55);
-  border: 2rpx solid rgba(255, 255, 255, 0.08);
+  background: $watermark-bg-card;
+  color: $watermark-text-secondary;
+  border: 2rpx solid $watermark-border-card;
   transition: all 0.3s ease;
 
   &.active {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: #FFFFFF;
+    background: $watermark-primary-gradient;
+    color: $watermark-text-primary;
     border-color: #667eea;
   }
 
@@ -412,37 +512,58 @@ export default {
   }
 }
 
-.params-panel {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 16rpx;
-  padding: 30rpx;
-  margin-bottom: 30rpx;
-}
-
+// 三列栅格：标签固定宽度 / 控件吃掉剩余 / 数值定宽右对齐，保证四行滑块严格对齐
 .param-row {
   display: flex;
   align-items: center;
-  margin-bottom: 30rpx;
+  height: 72rpx;
 
-  &:last-child {
-    margin-bottom: 0;
+  & + & {
+    margin-top: 4rpx;
+  }
+
+  // 当前模式下不生效的参数（密度/角度在非平铺模式）
+  &.muted {
+    opacity: 0.35;
   }
 }
 
 .param-label {
-  font-size: 28rpx;
-  color: rgba(255, 255, 255, 0.55);
-  min-width: 140rpx;
+  flex: none;
+  width: 100rpx;
+  font-size: 26rpx;
+  color: $watermark-text-secondary;
+}
+
+.param-slider {
+  flex: 1;
+  margin: 0 16rpx;
+}
+
+.param-value {
+  flex: none;
+  width: 90rpx;
+  text-align: right;
+  font-size: 26rpx;
+  color: $watermark-text-secondary;
+  // 等宽数字，避免数值变化时右侧文字左右抖动
+  font-variant-numeric: tabular-nums;
 }
 
 .text-input {
-  flex: 1;
-  padding: 16rpx 24rpx;
+  width: 100%;
+  height: 72rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.05);
   border: 2rpx solid rgba(255, 255, 255, 0.1);
   border-radius: 12rpx;
-  color: #FFFFFF;
+  color: $watermark-text-primary;
   font-size: 28rpx;
+}
+
+.text-input-placeholder {
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .preset-tags {
@@ -453,10 +574,10 @@ export default {
 
 .preset-tag {
   padding: 8rpx 20rpx;
-  background: rgba(255, 255, 255, 0.05);
+  background: $watermark-bg-card;
   border-radius: 20rpx;
   font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.55);
+  color: $watermark-text-secondary;
   border: 2rpx solid rgba(255, 255, 255, 0.1);
 
   &:active {
@@ -464,43 +585,34 @@ export default {
   }
 }
 
-.param-slider {
-  flex: 1;
-  margin: 0 20rpx;
-}
-
-.param-value {
-  min-width: 80rpx;
-  text-align: right;
-  font-size: 26rpx;
-  color: rgba(255, 255, 255, 0.55);
-}
-
 .color-picker {
   flex: 1;
   display: flex;
   gap: 16rpx;
-  flex-wrap: wrap;
 }
 
 .color-dot {
-  width: 56rpx;
-  height: 56rpx;
+  width: 52rpx;
+  height: 52rpx;
   border-radius: 50%;
   border: 4rpx solid transparent;
   transition: all 0.2s ease;
 
   &.active {
-    border-color: #00F5FF;
+    border-color: $watermark-accent-color;
     box-shadow: 0 0 16rpx rgba(0, 245, 255, 0.3);
   }
 
+  // 自定义色格：未选自定义色时空心虚线，选中后由内联 style 填充实际颜色
   &.custom {
-    background: rgba(255, 255, 255, 0.1) !important;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2rpx dashed rgba(255, 255, 255, 0.2);
+
+    &:not(.active) {
+      background: rgba(255, 255, 255, 0.1) !important;
+      border: 2rpx dashed rgba(255, 255, 255, 0.2);
+    }
   }
 
   &:active {
@@ -510,25 +622,30 @@ export default {
 
 .custom-color-text {
   font-size: 32rpx;
-  color: rgba(255, 255, 255, 0.55);
+  color: $watermark-text-secondary;
+  line-height: 1;
 }
 
 .action-bar {
+  flex: none;
+  // 内容不足一屏时把操作栏压到底部；内容超出一屏时它就在参数下方、随页面滚动
+  margin-top: auto;
+  padding-top: 24rpx;
   display: flex;
   gap: 20rpx;
 }
 
 .action-btn {
   flex: 1;
-  padding: 28rpx;
+  padding: 26rpx 0;
   border-radius: 48rpx;
   font-size: 32rpx;
   border: none;
   transition: all 0.2s ease;
 
   &.primary {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: #FFFFFF;
+    background: $watermark-primary-gradient;
+    color: $watermark-text-primary;
 
     &[disabled] {
       opacity: 0.3;
@@ -540,8 +657,8 @@ export default {
   }
 
   &.secondary {
-    background: rgba(255, 255, 255, 0.05);
-    color: #FFFFFF;
+    background: $watermark-bg-card;
+    color: $watermark-text-primary;
     border: 2rpx solid rgba(255, 255, 255, 0.1);
 
     &:active {

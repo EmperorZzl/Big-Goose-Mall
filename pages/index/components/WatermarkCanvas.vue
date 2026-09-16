@@ -1,5 +1,5 @@
 <template>
-  <view class="watermark-canvas-wrapper" :style="{ width: wrapperWidth + 'rpx' }">
+  <view class="watermark-canvas-wrapper" :style="wrapperStyle">
     <canvas
       type="2d"
       :id="canvasId"
@@ -20,9 +20,10 @@ export default {
       type: String,
       default: 'watermark-canvas'
     },
+    // 容器宽度（rpx）。0 = 自适应内容宽度（预览尺寸已由父组件 contain-fit 算好，无需再约束）
     wrapperWidth: {
       type: Number,
-      default: 650 // rpx，容器宽度
+      default: 0
     },
     canvasWidth: {
       type: Number,
@@ -64,6 +65,14 @@ export default {
   },
   computed: {
     /**
+     * 容器样式：wrapperWidth 为 0 时不设宽度，让容器收缩包裹 canvas 并由外层居中，
+     * 避免给预览尺寸再套一层固定的 rpx 宽度（会与实际量测出的尺寸打架）。
+     * 返回字符串而非对象 —— WXML 的 style 绑定只可靠地接受字符串。
+     */
+    wrapperStyle() {
+      return this.wrapperWidth > 0 ? `width:${this.wrapperWidth}rpx;` : ''
+    },
+    /**
      * canvas 的 CSS 显示尺寸与位图尺寸解耦：
      * 位图尺寸（canvas.width/height）决定导出分辨率，
      * 显示尺寸决定布局。canvas 必须完整位于视口内，
@@ -72,7 +81,7 @@ export default {
     canvasStyle() {
       const w = this.displayWidth > 0 ? this.displayWidth : this.canvasWidth
       const h = this.displayHeight > 0 ? this.displayHeight : this.canvasHeight
-      return { width: w + 'px', height: h + 'px' }
+      return `width:${w}px;height:${h}px;`
     }
   },
   created() {

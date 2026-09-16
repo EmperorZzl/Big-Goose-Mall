@@ -56,14 +56,22 @@ export default {
 
 <style lang="scss" scoped>
 .image-picker {
+  // flex:1 吃满步骤区剩余高度，把选择卡片垂直居中
+  flex: 1;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 60rpx;
 }
 
 .picker-card {
-  background: rgba(255, 255, 255, 0.05);
+  width: 100%;
+  background: $watermark-bg-card;
   border: 2rpx dashed rgba(255, 255, 255, 0.2);
   border-radius: 32rpx;
   padding: 80rpx 60rpx;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -83,7 +91,7 @@ export default {
 
 .picker-text {
   font-size: 32rpx;
-  color: rgba(255, 255, 255, 0.55);
+  color: $watermark-text-secondary;
 }
 
 .picker-buttons {
@@ -100,13 +108,13 @@ export default {
   transition: all 0.2s ease;
 
   &.album {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: #FFFFFF;
+    background: $watermark-primary-gradient;
+    color: $watermark-text-primary;
   }
 
   &.camera {
     background: rgba(255, 255, 255, 0.1);
-    color: #FFFFFF;
+    color: $watermark-text-primary;
     border: 2rpx solid rgba(255, 255, 255, 0.2);
   }
 

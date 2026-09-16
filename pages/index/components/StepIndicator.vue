@@ -29,13 +29,13 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 24rpx;
-  padding: 40rpx 0;
+  gap: 20rpx;
+  padding: 24rpx 0;
 }
 
 .step-dot {
-  width: 56rpx;
-  height: 56rpx;
+  width: 44rpx;
+  height: 44rpx;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   border: 2rpx solid rgba(255, 255, 255, 0.2);
@@ -45,8 +45,8 @@ export default {
   transition: all 0.3s ease;
 
   &.active {
-    background: #00F5FF;
-    border-color: #00F5FF;
+    background: $watermark-accent-color;
+    border-color: $watermark-accent-color;
     box-shadow: 0 0 20rpx rgba(0, 245, 255, 0.4);
 
     .dot-number {
@@ -56,14 +56,14 @@ export default {
   }
 
   &.completed {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: $watermark-primary-gradient;
     border-color: #667eea;
   }
 }
 
 .dot-number {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 22rpx;
+  color: $watermark-text-secondary;
   font-weight: 500;
 }
 </style>
