@@ -33,9 +33,8 @@
 
     <!-- 参数面板：分组 + 每行只放一个控件，避免互相挤压 -->
     <view class="params-panel">
-      <!-- 位置模式 -->
+      <!-- 位置模式：三个按钮直接打头，不写分组标题（省一行高度） -->
       <view class="param-group">
-        <text class="group-label">水印位置</text>
         <view class="position-selector">
           <view
             v-for="mode in positionModes"
@@ -49,16 +48,18 @@
         </view>
       </view>
 
-      <!-- 文字：输入框独占一行，预设标签另起一行 -->
+      <!-- 文字：标签与输入框同一行，预设标签另起一行 -->
       <view class="param-group">
-        <text class="group-label">水印文字</text>
-        <input
-          v-model="config.text"
-          class="text-input"
-          placeholder="输入水印文字"
-          placeholder-class="text-input-placeholder"
-          @input="handleConfigChange"
-        />
+        <view class="param-row">
+          <text class="param-label">水印文字</text>
+          <input
+            v-model="config.text"
+            class="text-input"
+            placeholder="输入水印文字"
+            placeholder-class="text-input-placeholder"
+            @input="handleConfigChange"
+          />
+        </view>
         <view class="preset-tags">
           <view
             v-for="preset in presetTexts"
@@ -530,7 +531,8 @@ export default {
 
 .param-label {
   flex: none;
-  width: 100rpx;
+  // 112rpx 而非 100rpx：要放得下「水印文字」4 个汉字（26rpx × 4 ≈ 104rpx），否则会折行
+  width: 112rpx;
   font-size: 26rpx;
   color: $watermark-text-secondary;
 }
@@ -551,7 +553,9 @@ export default {
 }
 
 .text-input {
-  width: 100%;
+  // 与 .param-label 同处一行，吃掉剩余宽度。min-width:0 防止 flex 子级按内容撑开溢出
+  flex: 1;
+  min-width: 0;
   height: 72rpx;
   padding: 0 24rpx;
   box-sizing: border-box;
